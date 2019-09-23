@@ -35,5 +35,6 @@ uri = "http://%s:%d" % (args.hostname, args.port)
 adc = AirdroidConnection(uri)
 adc.login()
 for vfsentry in adc.query_path(args.path):
+#	if vfsentry.path.startswith("/sdcard/DCIM/Camera/20190530"):
 	print(vfsentry.path, vfsentry.size)
 	adc.download_vfsentry(vfsentry, args.local)
