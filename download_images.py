@@ -28,13 +28,12 @@ parser = FriendlyArgumentParser()
 parser.add_argument("--port", metavar = "port", type = int, default = 8888, help = "Port that Airdroid uses. Defaults to %(default)d.")
 parser.add_argument("-p", "--path", metavar = "path", default = "/sdcard/DCIM/Camera", help = "Path that is downloaded from the smart phone. Defaults to %(default)s.")
 parser.add_argument("-l", "--local", metavar = "path", default = "camera", help = "Local directory that the downloaded files are stored into. Defaults to %(default)s.")
+parser.add_argument("-v", "--verbose", action = "count", default = 0, help = "Increase verbosity.")
 parser.add_argument("hostname", metavar = "ipaddress", type = str, help = "Hostname or IP address where the Airdroid connection can be reached")
 args = parser.parse_args(sys.argv[1:])
 
 uri = "http://%s:%d" % (args.hostname, args.port)
-adc = AirdroidConnection(uri)
+adc = AirdroidConnection(uri, verbose = (args.verbose >= 1))
 adc.login()
 for vfsentry in adc.query_path(args.path):
-#	if vfsentry.path.startswith("/sdcard/DCIM/Camera/20190530"):
-	print(vfsentry.path, vfsentry.size)
 	adc.download_vfsentry(vfsentry, args.local)

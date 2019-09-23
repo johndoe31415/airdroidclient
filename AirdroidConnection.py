@@ -36,8 +36,9 @@ class AirdroidConnection():
 		2:	"dir",
 	}
 
-	def __init__(self, endpoint):
+	def __init__(self, endpoint, verbose = False):
 		self._endpoint = endpoint
+		self._verbose = verbose
 		self._sess = requests.Session()
 		self._login_data = { }
 		self._des_crypto = None
@@ -131,12 +132,16 @@ class AirdroidConnection():
 			os.makedirs(destination_directory)
 		destination_filename = destination_directory + "/" + os.path.basename(vfsentry.path)
 		if (on_exists == "ignore") and os.path.exists(destination_filename):
+			if self._verbose:
+				print("%s: Skipped download, already exists" % (vfsentry.path))
 			return
 		if on_exists == "overwrite_if_newer":
 			existing_mtime = os.path.stat(destination_filename).st_mtime
 			print(existing_mtime)
 			raise NotImplementedError("TODO")
 
+		if self._verbose:
+			print("%s: %d bytes downloading" % (vfsentry.path, vfsentry.size))
 		content = self.retrieve_file(vfsentry.path)
 		with open(destination_filename, "wb") as f:
 			f.write(content)
