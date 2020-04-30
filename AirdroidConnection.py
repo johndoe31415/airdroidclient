@@ -1,5 +1,5 @@
 #	airdroidclient - Scriptable interface to the Airdroid smart phone app
-#	Copyright (C) 2019-2019 Johannes Bauer
+#	Copyright (C) 2019-2020 Johannes Bauer
 #
 #	This file is part of airdroidclient.
 #
@@ -26,7 +26,9 @@ import urllib.parse
 import requests
 from DESEncrypt import DESEncrypt
 
-class ConnectionException(Exception): pass
+class AirdroidException(Exception): pass
+class ConnectionException(AirdroidException): pass
+class DirectoryListingError(AirdroidException): pass
 
 class AirdroidConnection():
 	_VFSEntry = collections.namedtuple("VFSEntry", [ "filetype", "path", "size", "mtime" ])
@@ -54,8 +56,10 @@ class AirdroidConnection():
 			data = response.json()
 		elif result == "raw":
 			data = response.content
-		else:
+		elif result == "response":
 			data = response
+		else:
+			raise NotImplementedError(result)
 		return data
 
 	def login(self):
@@ -67,7 +71,22 @@ class AirdroidConnection():
 		self._login_data = login_data
 		return login_data
 
-	def get_file_properties(self, filename):
+	def is_dir(self, filename):
+		if filename == "/":
+			# This creates an Exception in Airdroid, so we handle it ourselves
+			return True
+
+		params = {
+			"cur_path":		os.path.basename(filename),
+			"uri":			"",
+			"child_uri":	"",
+			"7bb":			self._login_data["7bb"],
+			"des":			"1",
+		}
+		result = self._get("/sdctl/file_v21/querydir", params)
+		return ("list" in result)
+
+	def stat_file(self, filename):
 		params = {
 			"files":		os.path.basename(filename),
 			"dirs":			"",
@@ -78,27 +97,36 @@ class AirdroidConnection():
 			"des":			"1",
 		}
 		result = self._get("/sdctl/file_v21/properties", params)
+		if (result["size"] == 0) and (result["block_size"] == 0) and (result["last_modified_time"] == 0):
+			# File does probably not exist
+			return None
 		filetype = self._FILETYPES.get(result["code"], "unknown")
 		vfsentry = self._VFSEntry(filetype = filetype, path = filename, size = result["size"], mtime = result["last_modified_time"] / 1000)
 		return vfsentry
 
-	def query_path(self, filename):
+	def list_directory(self, dirname):
 		params = {
-			"cur_path":		filename,
+			"cur_path":		dirname,
 			"uri":			"",
 			"child_uri":	"",
 			"7bb":			self._login_data["7bb"],
 			"des":			"1",
 		}
 		result = self._get("/sdctl/file_v21/query", params)
+		if "cur_path" not in result:
+			raise DirectoryListingError("No such directory: %s (%s)" % (dirname, str(result)))
 		base_path = result["cur_path"]
 		if not base_path.endswith("/"):
 			base_path += "/"
 		for entry in result["list"]:
 			filetype = self._FILETYPES.get(entry["type"], "unknown")
-			_VFSEntry = collections.namedtuple("VFSEntry", [ "filetype", "path", "size", "mtime" ])
 			vfsentry = self._VFSEntry(filetype = filetype, path = base_path + entry["name"], size = entry.get("size", 0), mtime = entry["last_modified"] / 1000)
 			yield vfsentry
+
+	def stat(self, file_or_dirname):
+		if self.is_dir(file_or_dirname):
+			return self._VFSEntry(filetype = "dir", path = file_or_dirname, size = 0, mtime = 0)
+		return self.stat_file(file_or_dirname)
 
 	def walk_path(self, filename):
 		for vfsentry in self.query_path(filename):
@@ -108,9 +136,6 @@ class AirdroidConnection():
 
 	def mkdir(self, path):
 		result = self._get("/sdctl/file_v21/createdir", params)
-
-	def queryfile(self, path):
-		result = self._get("/sdctl/file_v21/querydir", params)
 
 	def retrieve_file(self, filename, mtime = None):
 		filename = filename.encode("utf-8")
@@ -123,8 +148,8 @@ class AirdroidConnection():
 		}
 		if mtime is not None:
 			params["last_modified"] = round(mtime * 1000)
-		content = self._get("/sdctl/file_v21/export", params, result = "raw")
-		return content
+		response = self._get("/sdctl/file_v21/export", params, result = "response")
+		return response.content
 
 	def download_vfsentry(self, vfsentry, destination_directory, on_exists = "ignore"):
 		assert(on_exists in [ "ignore", "overwrite", "overwrite_if_newer" ])
