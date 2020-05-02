@@ -91,6 +91,7 @@ class AndroidCopier():
 				content = self._adc.retrieve_file(remote_filename)
 				written = f.write(content)
 				success = (written == fstat.size)
+			os.utime(local_filename, (fstat.mtime, fstat.mtime))
 			if not success:
 				print("Error copying: %s" % (remote_filename), file = sys.stderr)
 				os.unlink(local_filename)
