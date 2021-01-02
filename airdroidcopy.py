@@ -39,6 +39,7 @@ parser.add_argument("-r", "--recurse", action = "store_true", help = "Recursivel
 parser.add_argument("-n", "--no-copy", action = "store_true", help = "Do not copy files, just print what would happen.")
 parser.add_argument("-z", "--zero-files", action = "store_true", help = "Create files with filesize zero.")
 parser.add_argument("-e", "--empty-directories", action = "store_true", help = "Preserve empty directories.")
+parser.add_argument("-f", "--fast-skip", action = "store_true", help = "When encountering a file that is named identically to one locally present, do not verify file size, but skip it immediately.")
 parser.add_argument("-v", "--verbose", action = "count", default = 0, help = "Increase verbosity.")
 parser.add_argument("src", metavar = "hostname:pathspec", type = host_path, help = "Hostname or IP address where the Airdroid connection can be reached and ")
 parser.add_argument("dst", metavar = "pathname", type = str, help = "Filename or directory name that is the local destination")
@@ -70,6 +71,10 @@ class AndroidCopier():
 				os.rmdir(local_path)
 
 	def _copy_file(self, remote_filename, local_filename):
+		if os.path.isfile(local_filename) and self._args.fast_skip:
+			print("Fast skipping: %s" % (remote_filename))
+			return
+
 		fstat = self._adc.stat_file(remote_filename)
 		if fstat is None:
 			print("Cannot stat: %s" % (remote_filename))
@@ -104,6 +109,8 @@ class AndroidCopier():
 		if root_stat is None:
 			print("Could not stat: %s" % (remote_path), file = sys.stderr)
 			return
+		if self._args.verbose >= 2:
+			print("Root stat: %s" % (str(root_stat)))
 
 		if root_stat.filetype == "file":
 			self._copy_file(remote_path, local_path)

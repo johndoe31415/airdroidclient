@@ -77,7 +77,7 @@ class AirdroidConnection():
 			return True
 
 		params = {
-			"cur_path":		os.path.basename(filename),
+			"cur_path":		filename,
 			"uri":			"",
 			"child_uri":	"",
 			"7bb":			self._login_data["7bb"],
@@ -97,6 +97,8 @@ class AirdroidConnection():
 			"des":			"1",
 		}
 		result = self._get("/sdctl/file_v21/properties", params)
+		if "err" in result:
+			return None
 		if (result["size"] == 0) and (result["block_size"] == 0) and (result["last_modified_time"] == 0):
 			# File does probably not exist
 			return None
